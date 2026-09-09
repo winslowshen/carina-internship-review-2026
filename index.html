@@ -242,6 +242,28 @@ font-size:15px;color:#4a4555;line-height:1.74;border-left:4px solid #C2244E;font
   .sec{padding:60px 16px 48px}.hero h1{font-size:32px}
   .imgrow img,.galrow img{height:auto!important;max-width:100%}
 }
+
+/* ===== INLINE EDIT MODE ===== */
+#editFab{position:fixed;right:22px;bottom:22px;z-index:9999;display:none;align-items:center;gap:8px;
+padding:13px 22px;border-radius:30px;border:none;cursor:pointer;
+background:linear-gradient(135deg,#C2244E,#FF567D);color:#fff;font-size:14px;font-weight:700;
+box-shadow:0 8px 28px rgba(194,36,78,.38);font-family:inherit}
+#editFab:hover{transform:translateY(-2px);box-shadow:0 12px 34px rgba(194,36,78,.48)}
+#editBar{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;z-index:9999;display:none;
+align-items:center;gap:10px;padding:12px 16px;border-radius:16px;background:#fff;
+box-shadow:0 12px 44px rgba(0,0,0,.2);border:1px solid rgba(0,0,0,.07);font-family:inherit;flex-wrap:wrap;justify-content:center}
+#editBar .hint{font-size:12.5px;color:#6b6578;margin-right:4px}
+#editBar button{padding:9px 16px;border-radius:10px;border:1px solid #e5e0ea;background:#fff;
+color:#4a4555;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+#editBar button:hover{border-color:#C2244E;color:#C2244E}
+#editBar button.primary{background:linear-gradient(135deg,#C2244E,#FF567D);color:#fff;border:none}
+#editBar button.primary:hover{filter:brightness(1.06);color:#fff}
+#draftBar{position:fixed;top:0;left:0;right:0;z-index:10000;display:none;padding:11px 16px;
+background:#fff4e5;color:#8a5a00;font-size:13px;text-align:center;border-bottom:1px solid #f0d9b5}
+body.editing [data-ed]{outline:1px dashed rgba(194,36,78,.5)!important;outline-offset:3px;border-radius:4px}
+body.editing [data-ed]:hover{outline-color:#C2244E!important;background:rgba(194,36,78,.05)}
+body.editing [data-ed]:focus{outline:2px solid #C2244E!important;background:rgba(194,36,78,.08)}
+@media(max-width:600px){#editBar{bottom:14px;gap:7px;padding:10px 12px}#editBar button{padding:8px 12px;font-size:12px}}
 </style>
 </head>
 <body>
@@ -531,6 +553,16 @@ font-size:15px;color:#4a4555;line-height:1.74;border-left:4px solid #C2244E;font
 <p class="tys"><strong>胡可欣 Carina</strong> &nbsp;·&nbsp; Meitu · Marketing &amp; Growth &nbsp;·&nbsp; Summer Intern</p>
 </section>
 
+
+<div id="draftBar"></div>
+<button id="editFab">✎ 编辑内容</button>
+<div id="editBar">
+  <span class="hint">点任意文字即可修改</span>
+  <button id="btnDone" class="primary">完成</button>
+  <button id="btnDownload">下载 HTML</button>
+  <button id="btnReset">还原初始版</button>
+</div>
+
 <script>
 (function(){
   document.querySelectorAll('.nav-links a').forEach(function(a){
@@ -545,6 +577,128 @@ font-size:15px;color:#4a4555;line-height:1.74;border-left:4px solid #C2244E;font
     n.style.boxShadow=window.scrollY>20?'0 4px 30px rgba(0,0,0,.08)':'0 2px 20px rgba(0,0,0,.04)';
   });
 })();
+
+/* ===== INLINE EDIT MODE ===== */
+(function(){
+  var KEY='carina_review_draft_v1';
+  var SEL=['.hero-badge','.hero h1','.hero-sub','.tb','.hero-footer',
+  '.lbl','.ttl','.sub',
+  '.av-name','.av-role','.av-dates',
+  '.ct','.card p','.ip','.it',
+  '.thdr','.tla','.tld',
+  '.tc h3','.tcs','.tc p','.tck','.tcd','.tcn',
+  '.ab','.sl li','.kbn','.kbl',
+  '.ctt','.ctd',
+  '.mc h4','.mq','.mcd','.mtg span','.mkn','.mkl',
+  '.fw h4','.fw p',
+  '.jd h4','.jq','.jd p',
+  '.ev-note',
+  '.mk h4','.mkt span','.wst',
+  '.ps h5','.ps p',
+  '.on','.ol','.od',
+  '.lc h4','.ls','.lc p',
+  '.rfn','.qb',
+  '.pn','.nc h4','.nc p','.sq',
+  '.tym','.tys','.cap'].join(',');
+
+  var fab=document.getElementById('editFab');
+  var bar=document.getElementById('editBar');
+  var db=document.getElementById('draftBar');
+  if(!fab||!bar) return;
+  fab.style.display='flex';
+
+  function els(){ return Array.prototype.slice.call(document.querySelectorAll(SEL)); }
+
+  /* ---- restore draft BEFORE any destructive action (per-element, no innerHTML swap) ---- */
+  function restore(){
+    var raw=null; try{ raw=localStorage.getItem(KEY); }catch(e){ return false; }
+    if(!raw) return false;
+    var data=null; try{ data=JSON.parse(raw); }catch(e){ return false; }
+    if(!data) return false;
+    var list=els(), changed=false;
+    for(var k in data){
+      if(list[k] && typeof data[k]==='string' && data[k]!==list[k].innerHTML){
+        list[k].innerHTML=data[k]; changed=true;
+      }
+    }
+    return changed;
+  }
+  var restored=false;
+  try{ restored=restore(); }catch(e){ restored=false; }
+  if(restored && db){
+    db.textContent='已恢复上次未保存的修改 —— 点右下角「编辑内容」继续，或「还原初始版」撤销';
+    db.style.display='block';
+    setTimeout(function(){ db.style.display='none'; }, 7000);
+  }
+
+  function save(){
+    var data={}; var list=els();
+    for(var i=0;i<list.length;i++){ data[i]=list[i].innerHTML; }
+    try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){}
+  }
+
+  function start(){
+    document.body.classList.add('editing');
+    els().forEach(function(el){
+      el.setAttribute('data-ed','1');
+      try{ el.contentEditable='plaintext-only'; }catch(e){}
+      if(el.contentEditable!=='plaintext-only'){ el.setAttribute('contenteditable','true'); }
+    });
+    fab.style.display='none'; bar.style.display='flex';
+  }
+  function stop(){
+    document.body.classList.remove('editing');
+    els().forEach(function(el){
+      el.removeAttribute('contenteditable'); el.removeAttribute('data-ed');
+    });
+    fab.style.display='flex'; bar.style.display='none';
+    save();
+  }
+  function download(){
+    var wasEditing=document.body.classList.contains('editing');
+    stop();
+    var clone=document.documentElement.cloneNode(true);
+    ['editFab','editBar','draftBar'].forEach(function(id){
+      var n=clone.querySelector('#'+id); if(n && n.parentNode) n.parentNode.removeChild(n);
+    });
+    Array.prototype.forEach.call(clone.querySelectorAll('[contenteditable]'),function(n){ n.removeAttribute('contenteditable'); });
+    Array.prototype.forEach.call(clone.querySelectorAll('[data-ed]'),function(n){ n.removeAttribute('data-ed'); });
+    var b=clone.querySelector('body'); if(b) b.classList.remove('editing');
+    var out='<!DOCTYPE html>\n'+clone.outerHTML;
+    var blob=new Blob([out],{type:'text/html;charset=utf-8'});
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='carina_review.html';
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); if(a.parentNode) a.parentNode.removeChild(a); if(wasEditing) start(); },1200);
+  }
+
+  fab.addEventListener('click', start);
+  var bd=document.getElementById('btnDone'); if(bd) bd.addEventListener('click', stop);
+  var bdl=document.getElementById('btnDownload'); if(bdl) bdl.addEventListener('click', download);
+  var br=document.getElementById('btnReset');
+  if(br) br.addEventListener('click', function(){
+    if(!confirm('确定放弃所有修改，还原到初始版本？')) return;
+    try{ localStorage.removeItem(KEY); }catch(e){}
+    location.reload();
+  });
+
+  document.addEventListener('input', function(e){
+    if(!document.body.classList.contains('editing')) return;
+    var t=e.target;
+    if(t && t.hasAttribute && t.hasAttribute('data-ed')) save();
+  }, true);
+
+  document.addEventListener('paste', function(e){
+    if(!document.body.classList.contains('editing')) return;
+    var t=e.target;
+    if(!t || !t.hasAttribute || !t.hasAttribute('data-ed')) return;
+    e.preventDefault();
+    var txt=(e.clipboardData||window.clipboardData).getData('text/plain');
+    document.execCommand('insertText', false, txt);
+  }, true);
+})();
+
 </script>
 </body>
 </html>
